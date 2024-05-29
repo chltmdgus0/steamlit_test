@@ -1,0 +1,79 @@
+import streamlit as st
+import openai
+from PIL import Image
+import requests
+from io import BytesIO
+
+# OpenAI API Key를 입력 받는 함수
+@st.cache
+def get_openai_api_key():
+    api_key = st.text_input("OpenAI API Key를 입력하세요", type="password")
+    return api_key
+
+# OpenAI API 인증
+def authenticate_openai_api():
+    api_key = get_openai_api_key()
+    openai.api_key = api_key
+
+# 사용자 입력을 받아 GPT-3.5-turbo 모델로 요청을 보내고 응답을 반환하는 함수
+@st.cache(suppress_st_warning=True)
+def get_gpt_response(prompt):
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=150
+    )
+    return response.choices[0].text.strip()
+
+# 사용자 입력을 받아 DALL-E로 이미지를 생성하여 반환하는 함수
+@st.cache(suppress_st_warning=True)
+def get_dalle_image(prompt):
+    response = openai.Image.create(
+        engine="dalle",
+        prompt=prompt
+    )
+    image_url = response['output']['url']
+    image = Image.open(BytesIO(requests.get(image_url).content))
+    return image
+
+# 메인 함수
+def main():
+    st.title("GPT-3.5-turbo & DALL-E 웹 앱")
+
+    # 페이지 선택
+    page = st.sidebar.selectbox("페이지 선택", ["질문에 대한 답변", "이미지 생성"])
+
+    # OpenAI API 인증
+    authenticate_openai_api()
+
+    # 페이지별 기능 구현
+    if page == "질문에 대한 답변":
+        st.header("질문에 대한 답변")
+
+        # 사용자 질문 입력
+        user_input = st.text_area("질문을 입력하세요")
+
+        if st.button("답변 받기"):
+            # GPT-3.5-turbo 모델로 요청 보내고 응답 받기
+            if user_input:
+                response = get_gpt_response(user_input)
+                st.write("답변:")
+                st.write(response)
+            else:
+                st.warning("질문을 입력하세요.")
+
+    elif page == "이미지 생성":
+        st.header("이미지 생성")
+
+        # 사용자 프롬프트 입력
+        session_state = st.session_state.get("prompt", "")
+        user_prompt = st.text_area("이미지를 생성할 프롬프트를 입력하세요", value=session_state)
+
+        if user_prompt:
+            st.session_state["prompt"] = user_prompt
+            # DALL-E로 이미지 생성
+            image = get_dalle_image(user_prompt)
+            st.image(image, caption="DALL-E로 생성된 이미지")
+
+if __name__ == "__main__":
+    main()
